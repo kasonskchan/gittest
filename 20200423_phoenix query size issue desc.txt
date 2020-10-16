@@ -1,0 +1,23 @@
+﻿issue:
+    hbase透過phoenix進行query時，受限於若干主要指標: 
+        1. hbase.rpc.timeout (client端運行timeout)
+        2. phoenix.query.threadPoolSize (phoenix使用線程數) (about 128*CPU)
+        3. phoenix.query.queueSize
+    scan數據量過大時，會2,3而終止，或影響1超時終止。
+
+solution (client端解法):
+    short term:
+        1. 優化query SQL，key值都要被設為條件
+        2. 分批撈取，降低單次query的scan量
+        3. 手動調整3個指標以盡可能在硬體資源限制下撈出資料。
+            SOP:
+                1. 透過Ambari從Server端下載hbase-site.xml模板
+                2. 編輯hbase-site.xml之三個參數
+                3. 修改hbase-site.xml中hbase.rootdir，與hbase-default.xml相同 (${hbase.tmp.dir}/hbase) (hbase-default.xml為正確值，但hbase-site.xml優先權高)
+                4. 將hbase-site.xml丟入phoenix-client.jar中
+                5. 重新配置dbeaver的phoenix-client.jar
+    long term:
+        1. 數據依條件分流表格，降低單次query的scan量 (治本，推薦)
+        2. 依實際需求調整KEY_SEQ (UPSERT INTO SYSTEM.CATALOG)
+        3. 建立secondary index: Covered index (索引keyword嚴謹，重新審定需求撈取欄位以節省index占用空間及撈取時間) (待驗證)
+        4. 建立secondary index: Global/Local index (索引keyword寬鬆，但資料量及耗用效能翻倍) (待驗證)
